@@ -1,5 +1,7 @@
 import os
+import sys
 import csv
+import json
 import math
 import datetime
 import numpy as np
@@ -21,19 +23,27 @@ link_image = mpimg.imread("./RobotConfigs/Link.png")
 end_effector_image = mpimg.imread("./RobotConfigs/EndEffector.png")
 base_image = mpimg.imread("./RobotConfigs/Base.png")
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        return super(NumpyEncoder, self).default(obj)
+
 class RobotArmSimulator:
-    def __init__(self, master, robot: BasicRobotArm, starting_point, target_point):
+    def __init__(self, master, robot: BasicRobotArm):
         self.master = master
         self.robot = robot
         self.arm_animation = False
 
-        self.init_x0, self.init_y0 = starting_point
+        # self.init_x0, self.init_y0 = 0.2, 0.5
+        self.init_x0, self.init_y0 = 0.2111, 0.3111
 
-        self.x0, self.y0 = starting_point
-        self.xt, self.yt = target_point
-
-        self.max_x_vel, self.max_y_vel = 1, 1 # m/s
-        self.max_x_force, self.max_y_force = 3.5, 3.5 # N
+        #setting 1
+        self.max_x_vel, self.max_y_vel = 0.3, 0.3 # m/s
+        self.max_x_force, self.max_y_force = 1.0, 1.0 # N
+        #setting 2
+        # self.max_x_vel, self.max_y_vel = 0.3, 0.3 # m/s
+        # self.max_x_force, self.max_y_force = 0.5, 0.5 # N
 
         self.positions = []
         self.velocities = []
@@ -45,29 +55,27 @@ class RobotArmSimulator:
         self.fig = Figure(figsize=(6, 6), dpi=100)
         self.ax = self.fig.add_subplot(111)
 
-        self.ax.set_xlim(self.robot.x_min - 0.5, self.robot.x_max + 0.5)
-        self.ax.set_ylim(self.robot.y_min - 0.5, self.robot.y_max + 0.5)
+        self.fig.subplots_adjust(left=0.05, right=0.95, bottom=0.05, top=0.95)
+
+        self.ax.set_xlim(self.robot.x_min - 0.1, self.robot.x_max + 0.5)
+        self.ax.set_ylim(self.robot.y_min - 0.1, self.robot.y_max + 0.5)
         self.ax.set_aspect('equal', 'box')
         self.ax.grid(True)
 
-        self.starting_point, = self.ax.plot([], [], 'r*', ms=5)
-        self.target_point, = self.ax.plot([], [], 'g*', ms=5)
+        self.starting_point, = self.ax.plot([], [], 'g*', ms=5)
+        self.target_point, = self.ax.plot([], [], 'r*', ms=5)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self.master)
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        # initialize
-        self.robot.joint1_angle, self.robot.joint2_angle = self.robot.inverse_kinematics(self.x0, self.y0)
+        # initialize starting point
+        self.robot.joint1_angle, self.robot.joint2_angle = self.robot.inverse_kinematics(self.init_x0, self.init_y0)
         x, y = self.robot.forward_kinematics_from_states_2_joints([self.robot.joint1_angle, self.robot.joint2_angle])
 
         if self.arm_animation == False:
             self.arm_line, = self.ax.plot([], [], 'o-', lw=3)
             self.arm_line.set_data([0, x[0], x[1]], [0, y[0], y[1]])
-        # display fen velocity
-        # self.arrow_x = self.ax.annotate('', xy=(x[1] + 2, y[1]), xytext=(x[1],y[1]),arrowprops=dict(arrowstyle= '-|>',
-        #                                                                                      color='blue', lw=0.5, ls='--'))
-        # self.arrow_y = self.ax.annotate('', xy=(x[1], y[1]+1), xytext=(x[1], y[1]),arrowprops=dict(arrowstyle= '-|>',
-        #                                                                                      color='blue', lw=0.5, ls='--'))
+
         self.arrow = self.ax.annotate('', xy=(x[1] + 2, y[1] + 1), xytext=(x[1],y[1]),arrowprops=dict(arrowstyle= '-|>',
                                                                                              color='blue', lw=0.5, ls='solid'))
         self.force_arrow = self.ax.annotate('', xy=(x[1] + 2, y[1] + 1), xytext=(x[1],y[1]),arrowprops=dict(arrowstyle= '-|>',
@@ -87,16 +95,7 @@ class RobotArmSimulator:
         self.robot.joint1_velocity_track = []
         self.robot.joint2_velocity_track = []
 
-    def reconfig_robot(self, starting_point, target_point):
-        self.init_x0, self.init_y0 = starting_point
-
-        self.x0, self.y0 = starting_point
-        self.xt, self.yt = target_point
-
-    def reset_robot_to_teach(self):
-        self.robot.joint1_angle, self.robot.joint2_angle = self.robot.inverse_kinematics(self.init_x0, self.init_y0)
-
-    def draw_arm(self, vel_len_x=0, vel_len_y=0, force_len_x=0, force_len_y=0, ani=True, show_arm=True, show_start_pt=True):
+    def draw_arm(self, vel_len_x=0, vel_len_y=0, force_len_x=0, force_len_y=0, ani=True, show_arm=True):
         x, y = self.robot.forward_kinematics_from_states_2_joints([self.robot.joint1_angle, self.robot.joint2_angle])
 
         if self.arm_animation == True:
@@ -156,15 +155,7 @@ class RobotArmSimulator:
             self.arm_line.set_data([0, x[0], x[1]], [0, y[0], y[1]])
             if not show_arm:
                 self.arm_line.set_data([], [])
-        self.starting_point.set_data([self.x0],[self.y0])
-        self.target_point.set_data([self.xt], [self.yt])
 
-        
-
-        if not show_start_pt:
-            self.starting_point.set_data([], [])
-
-        # self.draw_arrow(vel_len_x, vel_len_y)
         self.draw_arrow(vel_len_x, vel_len_y, force_len_x, force_len_y)
         self.fig.canvas.draw()
         if ani:
@@ -173,42 +164,34 @@ class RobotArmSimulator:
     def draw_arrow(self, vel_len_x, vel_len_y, force_len_x, force_len_y):
         x, y = self.robot.forward_kinematics_from_states_2_joints([self.robot.joint1_angle, self.robot.joint2_angle])
 
-        # display fen velocity
-        # self.arrow_x.remove()
-        # self.arrow_y.remove()
-        # self.arrow_x = self.ax.annotate('', xy=(end_x, start_y), xytext=(start_x,start_y), arrowprops=dict(arrowstyle= '-|>',
-        #                                                                                      color='grey', lw=0.1, ls='--'))
-        # self.arrow_y = self.ax.annotate('', xy=(start_x, end_y), xytext=(start_x,start_y), arrowprops=dict(arrowstyle= '-|>',
-        #                                                                                      color='grey', lw=0.1, ls='--'))
-        
         self.arrow.remove()
         self.force_arrow.remove()
         
         start_x = x[1]
         start_y = y[1]
-        end_x = x[1] + vel_len_x * 0.5 # change arrow length
-        end_y = y[1] + vel_len_y * 0.5
+        # end_x = x[1] + vel_len_x * 1.5 # change arrow length
+        # end_y = y[1] + vel_len_y * 1.5
 
-        force_end_x = x[1] + force_len_x * 0.2 # change arrow length
-        force_end_y = y[1] + force_len_y * 0.2
+        # force_end_x = x[1] + force_len_x * 0.3 * 0.8 # change arrow length
+        # force_end_y = y[1] + force_len_y * 0.3 * 0.8
+        
+        end_x = x[1] + vel_len_x * 1.5 # change arrow length
+        end_y = y[1] + vel_len_y * 1.5
+
+        # force_end_x = x[1] + force_len_x * 1.0 # change arrow length
+        # force_end_y = y[1] + force_len_y * 1.0
+
+        force_end_x = x[1] + force_len_x * 0.5 # change arrow length
+        force_end_y = y[1] + force_len_y * 0.5
 
         self.arrow = self.ax.annotate('', xy=(end_x, end_y), xytext=(start_x,start_y), arrowprops=dict(arrowstyle= '-|>',
                                                                                              color='blue', lw=0.8, ls='solid'))
         
         self.force_arrow = self.ax.annotate('', xy=(force_end_x, force_end_y), xytext=(start_x,start_y), arrowprops=dict(arrowstyle= '-|>',
                                                                                              color='red', lw=1.0, ls='solid'))
-        
-
-    def set_x0y0(self, x0, y0):
-        self.x0 = x0
-        self.y0 = y0
-
-    def set_xtyt(self, xt, yt):
-        self.xt = xt
-        self.yt = yt
     
     def learn(self, phi, force, demo=5):
-        lam = 1e-7
+        lam = 1e-6
         I = np.identity(demo)
 
         learned = (np.linalg.inv(phi @ phi.T + lam * I) @ phi @ (force.T)).T
@@ -216,20 +199,18 @@ class RobotArmSimulator:
         return learned
     
 class RobotArmApp(tk.Tk):
-    def __init__(self, robot: BasicRobotArm, demo_num, trial_num, force_teach, std):
+    def __init__(self, robot: BasicRobotArm, demo_num, trial_num, force_teach, std, show_guidace_flag, student_animation):
         super().__init__()
         self.title("Two-Axis RR Robot Arm Simulator")
         self.geometry("1150x650") # width x height
 
         self.robot = robot
-        self.starting_point = [0.2, 0.5] #[0, 0]
-        self.target_point = [0, 0]
-        self.target_point_plot = [100, 100]
-        self.L = np.zeros((2, 5))
+
+        # self.target_point = [1.237, 0.592]
+        self.target_point = [1.22857732, 0.58413413]
+        self.L_real = np.zeros((2, 5))
         self.L_learner = np.zeros((2, 5))
         self.step = 0        
-
-        self.mode = ''
 
         # the data need to be recorded
         self.phi_recording = []
@@ -244,37 +225,35 @@ class RobotArmApp(tk.Tk):
         self.demo_num = demo_num        # the number of demos
         self.trail_cnt = 1              # 3 trials in one phase
         self.max_trail_num = trial_num  # 3 trails in each phase, input
-        self.phase_cnt = 1              # 6 phase in total
+        # self.max_trail_num = 1
+        self.phase_cnt = 3              # 6 phase in total
+        self.max_phase_num = 6
 
         self.force_teach_flag = force_teach
         self.std_noise = std
+        self.guidancetype = show_guidace_flag
 
-        self.show_strating_point = True
+        self.student_animation_show_flag = student_animation
+
+        # data save initialization
+        self.records = {
+            'datas': [],
+            'count': 0
+        }
         
-    def reset_canvas_config(self):
-        self.starting_point = [0.2, 0.5] #[0, 0]
-        self.target_point = [0, 0]
-        self.target_point_plot = [100, 100]
-        self.L = np.zeros((2, 5))
-        self.step = 0
+    def reset_canvas_config(self):        
 
-        # self.simulator.reconfig_robot(starting_point=self.starting_point, target_point=self.target_point)
-        self.simulator.reconfig_robot(starting_point=self.starting_point, target_point=self.target_point_plot)
         self.simulator.reset_robot()
 
         self.simulator.draw_arm(ani=False)
 
     def reset_teaching_config(self):
-        self.mode = ''
 
         self.demo_cnt = 0
 
         self.phi_recording = []
         self.force_recording = []
         
-        self.L_learner = np.zeros((2, 5))
-        self.teacher_trajectory = []
-
     def create_welcome_page(self):
         self.welcome_page_frame = tk.Frame(self)
         self.welcome_page_frame.grid(row=0, column=0)
@@ -288,7 +267,7 @@ class RobotArmApp(tk.Tk):
 
     def create_exp_start_btn(self):
         self.expstart_frame = tk.Frame(self)
-        self.expstart_frame.grid(row=2, column=0) #, padx=50, pady=50)
+        self.expstart_frame.grid(row=2, column=0)
 
         start_btn = tk.Button(self.expstart_frame, text="Start Experiment", height=2, width=33, font=("Arial", 12), command=self.exp_start_callback)
         start_btn.grid(row=0, column=0, sticky="nsew", pady = 20)
@@ -322,7 +301,7 @@ class RobotArmApp(tk.Tk):
             self.countdown_label.config(text="Countdown Finished!", font=("Arial", 15))
             # Enable any buttons or perform any actions you want when the countdown finishes
             if self.skill1_demo_btn.cget("state") == 'normal' and self.skill2_demo_btn.cget("state") == 'normal':
-                self.formal_teaching_callback()
+                self.create_formal_teaching_callback_page()
                 return
 
         minutes, seconds = divmod(remaining_time.seconds, 60)
@@ -336,14 +315,12 @@ class RobotArmApp(tk.Tk):
     def create_canvas(self):
         self.plot_frame = tk.Frame(self)
         self.plot_frame.grid(row=0, column=2, rowspan=4, padx=20, pady=5)
-        # self.simulator = RobotArmSimulator(self.plot_frame, self.robot, self.starting_point, self.target_point)
-        self.simulator = RobotArmSimulator(self.plot_frame, self.robot, self.starting_point, self.target_point_plot)
+        self.simulator = RobotArmSimulator(self.plot_frame, self.robot)
         self.simulator.draw_arm(ani=False)
 
     def create_play_mode(self):
         self.play_mode_frame = tk.Frame(self)
         self.play_mode_frame.grid(row=0, column=0, padx = 104, pady = 20)
-        # self.play_mode_frame.grid(row=0, column=0, columnspan=2, pady=5, sticky=tk.EW)
 
         self.skill1_demo_btn = tk.Button(self.play_mode_frame, text="Skill 1 Movement", height=2, width=33, font=("Arial", 12), command=self.skill1_demo_callback)
         self.skill1_demo_btn.grid(row=0, column=0, sticky="nsew", pady = 20)
@@ -353,76 +330,91 @@ class RobotArmApp(tk.Tk):
 
     def L_set(self, skill_num):
         if skill_num == 1:
-            self.starting_point = [0.8, 1.1] #[0.8, 1.1]
-            self.target_point = [0.0, 0.0]
-            self.target_point_plot = [1.23, 0.59]
+            # self.target_point = [1.237, 0.592] 
+            self.target_point = [1.22857732, 0.58413413]
+            # self.L_real = np.array([[1, 0, 0, 0, 0],
+            #             [0, 1, 0, 0, 0]])
+            # self.L_real = np.array([[0.3, 0, 0, 0, 0],
+            #             [0, 0.3, 0, 0, 0]])
+            self.L_real = np.array([[0.5, 0, 0, 0, 0],
+                        [0, 0.5, 0, 0, 0]])
+            # self.step = 75
+            self.step = 160
 
-            # self.simulator.reconfig_robot(starting_point=self.starting_point, target_point=self.target_point)
-            self.simulator.reconfig_robot(starting_point=self.starting_point, target_point=self.target_point_plot)
             self.simulator.reset_robot()
-
-            L_kd = np.array([[2, 0, 0, 0], [0, 2, 0, 0]])
-            L_d = np.array([[L_kd[0,0] * (-self.target_point[0])], [L_kd[1,1] * (-self.target_point[1])]])
-            self.L = np.concatenate((L_kd, L_d), axis=1)
-
-            self.step = 75
-            self.show_strating_point = True
         elif skill_num == 2:
-            self.starting_point = [0.2, 0.3]
-            self.target_point = [1.2, 1.2]
+            self.target_point = [0.8, 1.2]
+            # self.L_real = np.array([[-1, 0, -2, 0, 0.8],
+            #                    [0, -1, 0, -2, 1.2]])
+            self.L_real = np.array([[-0.6, 0, -1.2, 0, 0.8 * 0.6],
+                               [0, -0.6, 0, -1.2, 1.2 * 0.6]])
+            # self.step = 153
+            # self.step = 138
+            self.step = 200
 
-            self.simulator.reconfig_robot(starting_point=self.starting_point, target_point=self.target_point)
             self.simulator.reset_robot()
-
-            L_kd = np.array([[-3, 0, -7, 0], [0, -3, 0, -7]])
-            # L_d = np.array([[L_kd[0,0] * (-self.target_point[0]), 0], [0, L_kd[1,1] * (-self.target_point[1])]])
-            L_d = np.array([[L_kd[0,0] * (-self.target_point[0])], [L_kd[1,1] * (-self.target_point[1])]])
-            self.L = np.concatenate((L_kd, L_d), axis=1)
-
-            self.step = 153
-            self.show_strating_point = False
         else:
             raise ValueError('Invalid Skill Number.')
 
     def skill1_demo_callback(self):
         self.skill1_demo_btn.config(state='disabled')
         self.skill2_demo_btn.config(state='disabled')
+        self.simulator.init_x0, self.simulator.init_y0 = 0.8, 1.1
+        self.simulator.reset_robot()
         self.L_set(1)
-        self.simulator.robot.set_L(self.L)
-        if (self.target_point[0] - 0) ** 2 + (self.target_point[1] - 0) ** 2 <= 2 ** 2:
-            for i in range(self.step):
-                self.simulator.robot.trajectory.append(list(self.simulator.robot.get_end_effector_position()))
-                self.simulator.robot.velocity.append(list(self.simulator.robot.get_end_effector_velocity()))
+        self.simulator.robot.set_L(self.L_real)
 
-                self.simulator.draw_arm()
-                
-                self.simulator.robot.update_rk4()
+        self.simulator.starting_point.set_data(0.8, 1.1)
+        # self.simulator.target_point.set_data(1.237, 0.592)
+        self.simulator.target_point.set_data(1.22857732, 0.58413413)
+
+        for i in range(self.step):
+            self.simulator.robot.trajectory.append(list(self.simulator.robot.get_end_effector_position()))
+            self.simulator.robot.velocity.append(list(self.simulator.robot.get_end_effector_velocity()))
+
+            self.simulator.draw_arm()
+            
+            self.simulator.robot.update_rk4()
+
+        self.simulator.starting_point.set_data([], [])
+        self.simulator.target_point.set_data([], [])
         self.skill1_demo_btn.config(state='normal')
         self.skill2_demo_btn.config(state='normal')
+
+        # self.simulator.init_x0, self.simulator.init_y0 = 0.2, 0.5
+        self.simulator.init_x0, self.simulator.init_y0 = 0.2111, 0.3111
+        self.simulator.reset_robot()
 
     def skill2_demo_callback(self):
         self.skill1_demo_btn.config(state='disabled')
         self.skill2_demo_btn.config(state='disabled')
         self.L_set(2)
 
+        self.simulator.target_point.set_data([0.8], [1.2])
+
         starting_pts = [[0.3, 1.3], [0.7, 0.1], [1.6, 1.3], [0.1, 0.5]]
         for num in range(len(starting_pts)+1):
-            self.simulator.reconfig_robot(starting_point=self.starting_point, target_point=self.target_point)
+            self.simulator.init_x0, self.simulator.init_y0 = starting_pts[num-1]
+            self.simulator.starting_point.set_data([self.simulator.init_x0], [self.simulator.init_y0])
             self.simulator.reset_robot()
-            self.simulator.robot.set_L(self.L)
-            if (self.target_point[0] - 0) ** 2 + (self.target_point[1] - 0) ** 2 <= 2 ** 2:
+            self.simulator.robot.set_L(self.L_real)
+
+            x, y = self.simulator.robot.get_end_effector_position()
+            while (x-self.target_point[0])**2 + (y-self.target_point[1])**2 > 0.0005:
+                self.simulator.robot.trajectory.append(list(self.simulator.robot.get_end_effector_position()))
+                self.simulator.robot.velocity.append(list(self.simulator.robot.get_end_effector_velocity()))
+
+                self.simulator.draw_arm()
+                
+                self.simulator.robot.update_rk4()
+
                 x, y = self.simulator.robot.get_end_effector_position()
-                while (x-self.target_point[0])**2 + (y-self.target_point[1])**2 > 0.0005:
-                    self.simulator.robot.trajectory.append(list(self.simulator.robot.get_end_effector_position()))
-                    self.simulator.robot.velocity.append(list(self.simulator.robot.get_end_effector_velocity()))
-
-                    self.simulator.draw_arm()
-                    
-                    self.simulator.robot.update_rk4()
-
-                    x, y = self.simulator.robot.get_end_effector_position()
-            if num < len(starting_pts):
-                self.starting_point = starting_pts[num]
+        
+        # self.simulator.init_x0, self.simulator.init_y0 = 0.2, 0.5
+        self.simulator.init_x0, self.simulator.init_y0 = 0.2111, 0.3111
+        self.simulator.starting_point.set_data([], [])
+        self.simulator.target_point.set_data([], [])
+        self.simulator.reset_robot()
 
         self.skill1_demo_btn.config(state='normal')
         self.skill2_demo_btn.config(state='normal')
@@ -451,7 +443,7 @@ class RobotArmApp(tk.Tk):
             self.quit()
         self.create_exp_start_btn()
         
-    def formal_teaching_callback(self):
+    def create_formal_teaching_callback_page(self):
         self.reset_canvas_config()
         if self.participant_number!= -1:
             self.welcome_page_frame.destroy()
@@ -465,6 +457,7 @@ class RobotArmApp(tk.Tk):
 
             self.reset_canvas_config()
             self.mode_selection(skill_var=1)
+            self.demonstrate_button.config(state='normal')
         else:
             messagebox.showerror('Please input a valid participant ID.')
     
@@ -579,8 +572,7 @@ class RobotArmApp(tk.Tk):
 
         self.next_button = tk.Button(button_frame, text="Next", height=2, width=15, font=("Arial", 12), command=self.next_phase_btn_callback)
         self.next_button.pack()
-        
-        self.next_button.config(state='disabled')
+        self.next_button.config(state='disabled') # 初始化next button就是disabled的
 
     def create_teach_demo_button(self):
         button_frame = tk.Frame(self)
@@ -614,47 +606,76 @@ class RobotArmApp(tk.Tk):
     def mode_selection(self, skill_var):
         self.reset_teaching_config()
         self.unlock_slider()
-        self.demonstrate_button.config(state='normal')
 
-        self.position_slider_x.set(0.0)
-        self.position_slider_y.set(0.0)
+        self.position_slider_x.set(self.simulator.init_x0*10000)
+        self.position_slider_y.set(self.simulator.init_y0*10000)
         self.velocity_slider_x.set(0.0)
         self.velocity_slider_y.set(0.0)
         if self.force_teach_flag:
             self.force_slider_x.set(0.0)
             self.force_slider_y.set(0.0)
 
-        if skill_var == 1:
-            self.mode = 'S1NG'
+        if skill_var in [1,3,5]:
+            self.simulator.starting_point.set_data(0.8, 1.1)
+            # self.simulator.target_point.set_data(1.237, 0.592)
+            self.simulator.target_point.set_data(1.22857732, 0.58413413)
             self.L_set(1)
-        elif skill_var == 2:
-            self.mode = 'S2NG'
+        elif skill_var in [2,4,6]:
+            # self.simulator.starting_point.set_data(0.2, 0.3)
+            self.simulator.starting_point.set_data([], []) # dont show starting point, 因为这是从任意一个点。
+            self.simulator.target_point.set_data(0.8, 1.2)
             self.L_set(2)
-        elif skill_var == 3:
-            self.mode = 'S1G'
-            self.L_set(1)
-        elif skill_var == 4:
-            self.mode = 'S2NG'
-            self.L_set(2)
-            self.score_frame.destroy()
-            self.create_score_indicator(False)
-        elif skill_var == 5:
-            self.mode = 'S1NG'
-            self.L_set(1)
-        elif skill_var == 6:
-            self.mode = 'S2NG'
-            self.L_set(2)   
+            if skill_var == 4:
+                if self.guidancetype:
+                    self.score_frame.destroy()
+                    self.create_score_indicator(False)
 
-        self.simulator.robot.set_L(self.L)
-        
-        self.demo()
-        self.simulator.draw_arm(ani=False, show_arm=False, show_start_pt=self.show_strating_point)
+        self.simulator.robot.set_L(self.L_real)
 
-        if self.mode == 'S1G':
+        self.teacher_demo()
+        self.simulator.draw_arm(ani=False, show_arm=False)
+
+        if self.phase_cnt == 3 and self.guidancetype:
             self.create_score_indicator(True)
-        elif self.mode == 'S1NG' or self.mode == 'S2NG':
+        else:
             pass
+        
+    def next_phase_btn_callback(self):
 
+        self.unlock_slider()
+
+        self.position_slider_x.set(self.simulator.init_x0*10000)
+        self.position_slider_y.set(self.simulator.init_y0*10000)
+        self.velocity_slider_x.set(0.0)
+        self.velocity_slider_y.set(0.0)
+        if self.force_teach_flag:
+            self.force_slider_x.set(0.0)
+            self.force_slider_y.set(0.0)
+
+        self.next_button.config(state='disabled')
+        self.demonstrate_button.config(state='normal')
+
+        if self.trail_cnt < self.max_trail_num: # trail 1, trial 2 
+            self.trail_cnt += 1
+        else:                                   # trial 3
+            if self.phase_cnt <= 6:
+                self.phase_cnt += 1
+            self.trail_cnt = 1                  # reset trail = 1
+        self.trial_text_display.config(text=f"trial {self.trail_cnt}")
+
+        # phase change -> change skill 
+        if self.phase_cnt in [1, 3, 5] and self.trail_cnt == 1:
+            self.mode_selection(skill_var=self.phase_cnt)
+            self.text_display.config(text=f"Phase {self.phase_cnt}: Please teach skill 1", font=("Arial", 20))
+            print("reset all skill's parameter, phase and trail :", self.phase_cnt, self.trail_cnt)
+        elif self.phase_cnt in [2, 4, 6] and self.trail_cnt == 1:
+            self.mode_selection(skill_var=self.phase_cnt)
+            self.text_display.config(text=f"Phase {self.phase_cnt}: Please teach skill 2", font=("Arial", 20))
+            print("reset all skill's parameter, phase and trail :", self.phase_cnt, self.trail_cnt)
+        print("Phase {} - {}".format(self.phase_cnt, self.trail_cnt))
+                
+        self.reset_canvas_config()
+    
     def lock_slider(self):
         self.position_slider_x.config(state="disabled")
         self.position_slider_y.config(state="disabled")
@@ -673,7 +694,7 @@ class RobotArmApp(tk.Tk):
             self.force_slider_x.config(state="normal") 
             self.force_slider_y.config(state="normal") 
 
-    def demo(self):
+    def teacher_demo(self):
         if (self.target_point[0] - 0) ** 2 + (self.target_point[1] - 0) ** 2 <= 2 ** 2:
             for i in range(self.step):
                 self.simulator.robot.trajectory.append(list(self.simulator.robot.get_end_effector_position()))
@@ -684,6 +705,7 @@ class RobotArmApp(tk.Tk):
             self.save_desired_dynamic_motion()
             self.teacher_trajectory = self.simulator.robot.trajectory
             self.simulator.reset_robot()
+            print(np.shape(self.teacher_trajectory))
 
     def save_desired_dynamic_motion(self):
         trajectory = np.array(self.simulator.robot.trajectory)
@@ -699,6 +721,7 @@ class RobotArmApp(tk.Tk):
         self.actual_y_dot = velocity[:, 1]
 
     def x_pos_slider_changed(self, value):
+        self.demonstrate_button.config(state = "normal")
         # Convert the slider value to a suitable range for the x position
         x_position = float(value) / 10000
         # Calculate the maximum allowed radius
@@ -720,10 +743,11 @@ class RobotArmApp(tk.Tk):
         # Update the robot's joint angles
         self.simulator.robot.joint1_angle, self.simulator.robot.joint2_angle = joint_angles[0], joint_angles[1]
         # Redraw the robot
-        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
-
+        # self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False)
 
     def y_pos_slider_changed(self, value):
+        self.demonstrate_button.config(state = "normal")
         # Convert the slider value to a suitable range for the y position
         y_position = float(value) / 10000
         # Calculate the maximum allowed radius
@@ -745,9 +769,11 @@ class RobotArmApp(tk.Tk):
         # Update the robot's joint angles
         self.simulator.robot.joint1_angle, self.simulator.robot.joint2_angle = joint_angles[0], joint_angles[1]
         # Redraw the robot
-        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        # self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False)
 
     def x_vel_slider_changed(self, value):
+        self.demonstrate_button.config(state = "normal")
         # Convert the slider value to a suitable range for the x position
         x_velocity = float(value) / 5000
         # Keep the y position the same
@@ -757,9 +783,11 @@ class RobotArmApp(tk.Tk):
         # Update the robot's joint angles
         self.simulator.robot.joint1_velocity, self.simulator.robot.joint2_velocity = joint_velocity[0], joint_velocity[1]
         # Redraw the robot
-        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        # self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False)
         
     def y_vel_slider_changed(self, value):
+        self.demonstrate_button.config(state = "normal")
         # Convert the slider value to a suitable range for the x position
         y_velocity = float(value) / 5000
         # Keep the y position the same
@@ -769,54 +797,34 @@ class RobotArmApp(tk.Tk):
         # Update the robot's joint angles
         self.simulator.robot.joint1_velocity, self.simulator.robot.joint2_velocity = joint_velocity[0], joint_velocity[1]
         # Redraw the robot
-        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        # self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False)
         
     def x_force_slider_changed(self, value):
+        self.demonstrate_button.config(state = "normal")
         self.force_slider_value_x.config(text=f"{float(value)/5000}")
-        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        # self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False)
         
     def y_force_slider_changed(self, value):
+        self.demonstrate_button.config(state = "normal")
         self.force_slider_value_y.config(text=f"{float(value)/5000}")
-        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        # self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False, show_start_pt=self.show_strating_point)
+        self.simulator.draw_arm(self.velocity_slider_x.get() / 5000, self.velocity_slider_y.get() / 5000, self.force_slider_x.get() / 5000, self.force_slider_y.get() / 5000, ani=False)
         
-    def next_phase_btn_callback(self):
-        if self.trail_cnt < self.max_trail_num: # trail 1, trial 2 
-            self.trail_cnt += 1
-        else:                                   # trial 3
-            if self.phase_cnt <= 6:
-                self.phase_cnt += 1
-            self.trail_cnt = 1                  # reset trail = 1
-        self.trial_text_display.config(text=f"trial {self.trail_cnt}")
-
-        self.next_button.config(state='disabled')
-
-        if self.phase_cnt == 2:
-            self.text_display.config(text="Phase 2: Please teach Skill 2", font=("Arial", 20))
-        elif self.phase_cnt == 3:
-            self.text_display.config(text="Phase 3: Please teach Skill 1", font=("Arial", 20))
-        elif self.phase_cnt == 4:
-            self.text_display.config(text="Phase 4: Please teach Skill 2", font=("Arial", 20))
-        elif self.phase_cnt == 5:
-            self.text_display.config(text="Phase 5: Please teach Skill 1", font=("Arial", 20))
-        elif self.phase_cnt == 6:
-            self.text_display.config(text="Phase 6: Please teach Skill 2", font=("Arial", 20))
-        print("Phase {} - {}".format(self.phase_cnt, self.trail_cnt))
-        
-        self.reset_canvas_config()
-        self.mode_selection(skill_var=self.phase_cnt)
-
-        self.unlock_slider()
-
     def demonstrate_btn_callback(self):
         # self.unlock_slider()
         if self.demo_cnt <= self.demo_num-1:
-            # self.phi_each = [self.position_slider_x.get()/10000, self.position_slider_y.get()/10000, self.velocity_slider_x.get()/5000, self.velocity_slider_y.get()/5000]
-            # self.phi_recording.append(self.phi_each)
-            # self.phi_each = [self.position_slider_x.get()/10000, self.position_slider_y.get()/10000, self.velocity_slider_x.get()/5000, self.velocity_slider_y.get()/5000, 1]
-
+            
             self.phi_recording.append([self.position_slider_x.get()/10000, self.position_slider_y.get()/10000, self.velocity_slider_x.get()/5000, self.velocity_slider_y.get()/5000])
             if self.force_teach_flag:
                 self.force_recording.append([self.force_slider_x.get()/5000, self.force_slider_y.get()/5000])
+            print(f"{self.demo_cnt+1} demonstration completed.")
+            print("phi input:   ", self.phi_recording[self.demo_cnt] + [1])
+            print("force input: ", self.force_recording[self.demo_cnt])
+            print("real force:  ", self.L_real @ np.array(self.phi_recording[self.demo_cnt] + [1]))
+
+            self.demonstrate_button.config(state="disabled")
             self.demo_cnt += 1
             if self.demo_cnt == self.demo_num:
                 self.lock_slider()
@@ -839,7 +847,7 @@ class RobotArmApp(tk.Tk):
         phi = np.vstack((np.array(self.phi_recording).T, np.ones((1, 5))))
 
         if self.force_teach_flag == False: # force from calculated with noise
-            force_real = self.L @ phi
+            force_real = self.L_real @ phi
             force_noi_diff = self.force_std_noise * np.random.randn(2, 5)
             force_with_noise = force_real + force_noi_diff
             force_given = force_with_noise
@@ -849,44 +857,44 @@ class RobotArmApp(tk.Tk):
 
         # calculate theta
         self.L_learner = self.simulator.learn(phi, force_given)
-        print(f"{self.mode}: self.L = {self.L[0]}, {self.L[1]}")
-        print(f"{self.mode}: self.L_learner = {self.L_learner[0]}, {self.L_learner[1]}")
+        print(f"Phase: {self.phase_cnt}: self.L_real = {self.L_real[0]}, {self.L_real[1]}")
+        print(f"Phase: {self.phase_cnt}: self.L_learner = {self.L_learner[0]}, {self.L_learner[1]}")
 
         self.simulator.robot.set_L(self.L_learner)
         # show student's animation
         self.next_button.config(state='disabled')
-        if '1' in self.mode:
+
+        if self.phase_cnt in [1, 3, 5]:
             self.simulator.robot.joint1_angle, self.simulator.robot.joint2_angle = self.simulator.robot.inverse_kinematics(0.8, 1.1)
-        elif '2' in self.mode:
+        elif self.phase_cnt in [2, 4, 6]:
             self.simulator.robot.joint1_angle, self.simulator.robot.joint2_angle = self.simulator.robot.inverse_kinematics(0.2, 0.3)
         self.simulator.robot.joint1_velocity, self.simulator.robot.joint2_velocity = 0.0, 0.0
         for i in range(self.step):
             self.simulator.robot.trajectory.append(list(self.simulator.robot.get_end_effector_position()))
             self.simulator.robot.velocity.append(list(self.simulator.robot.get_end_effector_velocity()))
-            if True: # true = show student's animation, false = dont show
+            # if True: # true = show student's animation, false = dont show
+            if self.student_animation_show_flag:
                 self.simulator.draw_arm()
             self.simulator.robot.update_rk4()
         self.student_trajectory = self.simulator.robot.trajectory
 
         # calculate error
         rmse = np.sqrt(np.mean((np.array(self.teacher_trajectory) - np.array(self.student_trajectory))**2))
-        nmse = self.nmse_cal(self.L, self.L_learner)
-        el2 = self.el2_cal(self.L, self.L_learner)
+        nmse = self.nmse_cal(self.L_real, self.L_learner)
+        el2 = self.el2_cal(self.L_real, self.L_learner)
         print(f"rmse: {rmse}, nmse: {nmse}, el2: {el2}")
-
-        # calculate score for phase 3, and display only for phase 3
-        score1 = self.score1(phi, force_given)
-        new_score = self.new_score(phi, force_given)
-        score5 = self.score5(phi, force_given)
-        print(f"score1: {score1}, new_score: {new_score}, score5: {score5}")
-
-        if self.mode == 'S1G':
-            guidance_score = score5
+   
+        # calculate score, but only show on 3th phase
+        # guidance_score = self.score_calculator(phi, force_given)
+        guidance_score, record_each_guidance = self.score_calculator(phi, force_given)
+        print("score is: ", guidance_score)
+        if self.phase_cnt == 3 and self.guidancetype:
             self.score_text.insert(tk.END, '\n {}.'.format(guidance_score)) # display score
             self.score_text.see(tk.END)
 
         # store data tocsv file
-        self.store_data_tocsv(self.phase_cnt, self.trail_cnt, phi, force_given, self.L_learner, rmse, nmse, el2, new_score)
+        self.store_data_tocsv(self.phase_cnt, self.trail_cnt, phi, force_given, self.L_learner, rmse, nmse, el2, guidance_score, record_each_guidance)
+        self.store_data_tojson(phi, force_given, self.L_learner, rmse, nmse, el2, guidance_score, record_each_guidance)
 
         # reset robot
         self.simulator.reset_robot()
@@ -894,7 +902,8 @@ class RobotArmApp(tk.Tk):
         self.next_button.config(state='normal')
 
         # when phase_cnt = 6, exp. finished.
-        if self.phase_cnt >= 6 and self.trail_cnt == 3:
+        # if self.phase_cnt >= 6 and self.trail_cnt == 3:
+        if self.phase_cnt >= 6 and self.trail_cnt == self.max_trail_num:
             print("Finished!")
             messagebox.showinfo("Information", "Experiment Finished.")
             self.quit()
@@ -918,17 +927,14 @@ class RobotArmApp(tk.Tk):
         el2 = np.linalg.norm(theta_real - theta_learned)
         return el2
 
-    def store_data_tocsv(self, phase, trail, phi, force, theta_learned, rmse, nmse, el2, score):
-        # set path
-        current_path = os.path.dirname(os.path.abspath(__file__))
-        # new_folder_path = os.path.join(current_path, f'pilot_exp_results/pilot_exp_id_{self.participant_number}')
-        new_folder_path = os.path.join(current_path, f'pilot_exp_results')
-        os.makedirs(new_folder_path, exist_ok=True) # creates the subfolder if it does not exist
-        csv_file_name  = f"pilot_exp_id_{self.participant_number}.csv"
-        csv_file_path = os.path.join(new_folder_path, csv_file_name)
+    def store_data_tocsv(self, phase, trail, phi, force, theta_learned, rmse, nmse, el2, score, record_guidance):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        target_dir = os.path.join(os.path.join(current_dir, f'formal_exp_results'), f"formal_exp_id_{self.participant_number}")
+        os.makedirs(target_dir, exist_ok=True)
+        filename = os.path.join(target_dir, f"formal_exp_id_{self.participant_number}.csv")
         
         # store value
-        with open(csv_file_path, mode="a", newline="") as csvfile:
+        with open(filename, mode="a", newline="") as csvfile:
             csvwriter = csv.writer(csvfile)
 
             csvwriter.writerows([["phase", f"{phase}", "trail",f"{trail}"]])
@@ -952,129 +958,45 @@ class RobotArmApp(tk.Tk):
             csvwriter.writerows([["el2", f"{el2}"]])
             csvwriter.writerow([])
 
-            if self.mode == 'S1G':
+            csvwriter.writerows([["score", f"{score}"]])
+            csvwriter.writerows([["d", f"{record_guidance[0]}", "Rho",f"{record_guidance[1]}",  "c",f"{record_guidance[2]}"]])
+            csvwriter.writerow([])
+
+            if self.phase_cnt == 3:
                 csvwriter.writerows([["score", f"{score}"]])
                 csvwriter.writerow([])
 
-        print("Matrix saved to", csv_file_name)
+        print("Matrix saved to", filename)
         print("-----------------------------------------")  
     
+    def store_data_tojson(self, phi, force_given, L, rmse, nmse, el2, score, record_guidance):
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        target_dir = os.path.join(os.path.join(current_dir, f'formal_exp_results'), f"formal_exp_id_{self.participant_number}")
+        # target_dir = os.path.join(current_dir, 'formal_exp_results', f"formal_exp_id_{self.participant_number}")
+        filename = os.path.join(target_dir, f"formal_exp_id_{self.participant_number}.json")
+
+        if os.path.exists(filename):
+            with open(filename, 'r') as f:
+                self.records = json.load(f)
+
+        self.records['datas'].append({
+            'phi': phi,
+            'force': force_given,
+            'theta': L,
+            'rmse': rmse,
+            'nmse': nmse,
+            'el2': el2, 
+            'score': score,
+            'record each guidance': record_guidance
+        })
+        self.records['count'] += 1
+        
+        with open(filename, 'w') as f:
+            json.dump(self.records, f, cls=NumpyEncoder)
+         
     def SVD(self, phi):
         _, S, _ = np.linalg.svd(phi)
         return S
-    
-    def score(self, phi):
-        sigma_min = np.min(self.SVD(phi))
-        sigma_min_inverse = 1 / (sigma_min + 1e-10)
-
-        if sigma_min_inverse <= 50:
-            score = 99
-        elif sigma_min_inverse > 50 and sigma_min_inverse <=200:
-            score = 90
-        elif sigma_min_inverse > 200 and sigma_min_inverse <= 400:
-            score = 80
-        elif sigma_min_inverse > 400 and sigma_min_inverse <= 600:
-            score = 60
-        elif sigma_min_inverse > 600 and sigma_min_inverse <= 800:
-            score = 40
-        elif sigma_min_inverse > 800 and sigma_min_inverse <= 1000:
-            score = 20
-        elif sigma_min_inverse > 1000:
-            score = 0
-        
-        return score
-
-    def score1(self, phi, force):    
-        phi_star = np.array([[ 0.00353898,  0.04301875,  0.08119696,  0.10114971,  1.19618413],
-                    [ 0.06719514,  1.69925865,  0.15236148,  1.7271737,   1.19777084],
-                    [ 0.36519301, -0.88843374, -0.49570924,  0.92063472,  0.43162667],
-                    [-0.4055831,  -0.40190829,  0.97655309,  0.97670281, -0.77406324],
-                    [ 1.,          1.,          1.,          1.,          1.]])
-
-        force_star = np.array([[ 1.033032,   9.68997993,  6.82637378, -3.14789218, -3.00993908],
-                            [ 6.23749627,  1.31558208, -3.69295611, -8.41844078,  5.42513014]])
-        
-        star_value = np.vstack((phi_star, force_star))
-        
-        sorted_indices = np.argsort(phi[0, :]) # Sort the entire matrix column-wise using these indices
-        sorted_phi = phi[:, sorted_indices]
-        sorted_force = force[:, sorted_indices]
-        input_value = np.vstack((sorted_phi, sorted_force))
-
-        score = np.sum(np.abs(star_value - input_value))
-
-        return score
-    
-    def new_score(self, phi, force):
-        phi_star = np.array([[0.00353898, 1.19618413, 0.08119696, 0.10114971, 0.04301875],                        
-                         [0.06719514, 1.19777084, 0.15236148, 1.72717370, 1.69925865],                        
-                         [0.36519301, 0.43162667, -0.49570924, 0.92063472, -0.88843374],                        
-                         [-0.40558310, -0.77406324, 0.97655309, 0.97670281, -0.40190829],                        
-                         [1.00000000, 1.00000000, 1.00000000, 1.00000000, 1.00000000]])         
-        force_star = np.array([[1.03303200, -3.00993908, 6.82637378, -3.14789218, 9.68997993],                        
-                            [6.23749627, 5.42513014, -3.69295611, -8.41844078, 1.31558208]])        
-        star_value = np.vstack((phi_star, force_star))
-        sorted_matrix = self.sorted_func(phi, force)    
-        score = np.sum(np.abs(star_value - sorted_matrix))    
-        return score
-    
-    def sorted_func(self, matrix1, matrix2):
-        matrix1 = np.array(matrix1)
-        matrix2 = np.array(matrix2)
-        matrix = np.vstack((matrix1, matrix2))
-        # Calculate the L2 norm for each column
-        column_l2_norms = np.linalg.norm(matrix, axis=0, ord=2)
-        # Sort the columns based on L2 norms
-        sorted_indices = np.argsort(column_l2_norms)
-        sorted_matrix = matrix[:, sorted_indices]
-        return sorted_matrix
-
-    def fit_score_s1(self, min_sigma):
-        x_value = 1/(min_sigma + 1e-12)
-        # Hardcoded parameters from the fitted model
-        intercept = -0.062157
-        coef = 0.0001005
-        x_intercept = 618.21
-        x_el2_05 = 5591.02
-        
-        # If x is less than the intersection with the X-axis, the score is 100
-        if x_value < x_intercept:
-            return 100
-        
-        # If x is greater than the x value when el2 = 0.5, the score is 0
-        elif x_value > x_el2_05:
-            return 0
-        
-        # Otherwise, calculate the el2 value using the hardcoded model parameters
-        else:
-            el2_value = intercept + coef * x_value
-            
-            # Compute the score based on the el2 value
-            fit_score = 100 * (1 - (el2_value - 0) / (0.5 - 0))
-        
-        return fit_score
-
-    def fit_score_s2(self, min_sigma):
-        x_val = 1/min_sigma
-        coef = 0.0004
-        intercept = -0.0825
-        x_intercept = 222.67
-
-        # If x is smaller than the x-intercept
-        if x_val < x_intercept:
-            return 100
-
-        # Compute the predicted el2 using the regression equation
-        predicted_el2 = coef * x_val + intercept
-
-        # If predicted el2 is greater than 2
-        if predicted_el2 > 2:
-            return 0
-
-        # Rescale the predicted el2 to a score between 0 and 100
-        fit_score = 100 * (2 - predicted_el2) / 2
-
-        return fit_score
     
     def plot_dynamic_motion(self):
         # Create a figure with 4 subplots
@@ -1132,46 +1054,31 @@ class RobotArmApp(tk.Tk):
         plt.show(block=False)
         plt.pause(0.001) 
 
-    def score5(self, phi, force):
-        if self.phase_cnt == 1 or self.phase_cnt == 3 or self.phase_cnt == 5:
-            # phi_star = np.array([[0.80, 1.02, 1.57, 1.36, 1.23],
-            #                     [1.10, 1.24, 1.20, 0.72, 0.58],
-            #                     [0.0, 0.90, 0.15, -0.56, -0.02],
-            #                     [0.0, 0.45, -0.97, -0.66, -0.03],
-            #                     [1,1,1,1,1]])
-            # force_star = np.array([[1.6,  2.04, 3.14, 2.72, 2.46],
-            #                        [2.2,  2.48, 2.4,  1.44, 1.16]])
-            phi_star = np.array([[ 1.23,  0.8,   1.36,  1.02,  1.57],
-                                [ 0.58,  1.1,   0.72,  1.24,  1.2 ],
-                                [-0.02,  0.,   -0.56,  0.9,   0.15],
-                                [-0.03,  0.,   -0.66,  0.45, -0.97],
-                                [ 1.,    1.,    1.,    1.,    1.  ]])
-            
-            force_star = np.array([[ 2.46,  1.6,   2.72,  2.04,  3.14],
-                                [ 1.16,  2.2,   1.44,  2.48,  2.4 ]])
-        elif self.phase_cnt == 2 or self.phase_cnt == 4 or self.phase_cnt == 6:
-            # phi_star = np.array([[0.21, 0.47, 0.71, 0.90, 0.15],
-            #                     [0.31, 0.51, 0.69, 0.89, 0.16],
-            #                     [0.21, 0.37, 0.23, 0.13, 0.02],
-            #                     [0.20, 0.25, 0.22, 0.15, 0.02],
-            #                     [1,1,1,1,1]])
-            # force_star = np.array([[ 1.5,  -0.4,  -0.14, -0.01,  3.01],
-            #                        [ 1.27,  0.32, -0.01, -0.12,  2.98]])
-            phi_star = np.array([[0.47,  0.71,  0.9,   0.21,  0.15],
-                                [ 0.51,  0.69,  0.89,  0.31,  0.16],
-                                [ 0.37,  0.23,  0.13,  0.21,  0.02],
-                                [ 0.25,  0.22,  0.15,  0.2,   0.02],
-                                [ 1.,    1.,    1.,    1.,    1.  ]])
-            force_star = np.array( [[-0.4,  -0.14, -0.01,  1.5,   3.01],
-                                  [ 0.32, -0.01, -0.12,  1.27,  2.98]])
+    def score_calculator(self, phi, force):
+        norm_phi = normalize(phi, norm='l2', axis=0)
+        force_e = np.array(force - self.L_real @ phi)
 
-        star_value = np.vstack((phi_star, force_star))
-        sorted_matrix = self.sorted_func(phi, force)    
-        score = np.sum(np.abs(star_value - sorted_matrix))    
-        return score
-    
+        d = np.sum(abs(self.student_learn(phi, force_e)))
+        Rho = np.linalg.cond(phi)
+        c = np.sum(np.linalg.norm(phi, axis=0))
+        
+        w1 = 100.0
+        w2 = 0.01
+        w3 = 0.001
+        score = w1 * 1/d + w2 * 1/Rho + w3 * c
+        # score = (w1 * 1/d + w2 * 1/Rho + w3 * c)
+        
 
-    
+        return score, np.array([d, Rho, c])
+        
+    def student_learn(self, phi, force):
+        lam = 1e-6
+        I = np.identity(5)
+
+        learned = (np.linalg.inv(phi @ phi.T + lam * I) @ phi @ (force.T)).T
+        return learned
+
+
 
 if __name__ == "__main__":
     robot = BasicRobotArm(link1_length=1, link2_length=1, 
@@ -1179,10 +1086,10 @@ if __name__ == "__main__":
                         joint1_angle=0.0, joint2_angle=0.0, 
                         joint1_velocity=0.0, joint2_velocity=0.0, 
                         joint1_torque=0.0, joint2_torque=0.0,
-                        time_step=0.1, g=9.81)
+                        time_step=0.05, g=9.81)
 
     x0, y0 = 0.2, 1.5
     xt, yt = 1.5, 0.3
 
-    app = RobotArmApp(robot=robot, demo_num=5, trial_num=3, force_teach=True, std=0.0)
+    app = RobotArmApp(robot=robot, demo_num=5, trial_num=3, force_teach=True, std=0.0, show_guidace_flag = True, student_animation = True)
     app.mainloop()
