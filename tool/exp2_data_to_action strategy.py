@@ -30,7 +30,8 @@ target_paths = [r'D:\KCL\year2\myPaper\icra\exp2\exp2_data\target_user_01',
                 r'D:\KCL\year2\myPaper\icra\exp2\exp2_data\target_user_15',
                 r'D:\KCL\year2\myPaper\icra\exp2\exp2_data\target_user_16']
                 
-control_paths = [r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_02',
+control_paths = [r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_02',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_03',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_04',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_05',
@@ -42,10 +43,9 @@ control_paths = [r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_dat
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_14',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_15',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_16',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01']
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_10',
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_11',
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_12']
 
 target_el2s = []
 control_el2s = []
@@ -125,11 +125,19 @@ for i in range(len(control_paths)):
 target_thetas = np.array(target_thetas)
 control_thetas = np.array(control_thetas)
 
+# np.save('exp2_target_thetas.npy', target_thetas)
+# np.save('exp2_control_thetas.npy', target_thetas)
+
+
 target_real_thetas = np.array(target_real_thetas)
 control_real_thetas = np.array(control_real_thetas)
 print("target_real_thetas", np.shape(control_thetas), np.shape(control_real_thetas))
 
 
+
+
+
+# tihua
 # 模拟系统的函数
 def simulate_system(A, initial_state, steps=50):
     # x, y = initial_state[0], initial_state[1]

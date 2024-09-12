@@ -30,7 +30,8 @@ target_paths = [r'D:\KCL\year2\myPaper\icra\exp2\exp2_data\target_user_01',
                 r'D:\KCL\year2\myPaper\icra\exp2\exp2_data\target_user_15',
                 r'D:\KCL\year2\myPaper\icra\exp2\exp2_data\target_user_16']
                 
-control_paths = [r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_02',
+control_paths = [r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_02',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_03',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_04',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_05',
@@ -42,10 +43,9 @@ control_paths = [r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_dat
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_14',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_15',
                  r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_16',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01',
-                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_01']
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_10',
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_11',
+                 r'D:\KCL\uArmSwiftPro\uArm-Python-SDK\real_exp_results\exp2_data\control_group_user_12']
 
 target_el2s = []
 control_el2s = []
