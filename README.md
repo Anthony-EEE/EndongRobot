@@ -1,3 +1,3 @@
 # MTRobotSimulator
 
-Run Machine Teaching Robot Simulator by `python Simulator.py`.
+Run Machine Teaching Robot Simulator by `python Simulator_mouse_platform.py`.
